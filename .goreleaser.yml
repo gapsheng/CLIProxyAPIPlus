@@ -6,12 +6,13 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - windows
       - darwin
-      - freebsd
     goarch:
       - amd64
       - arm64
+    ignore:
+      - goos: darwin
+        goarch: amd64
     main: ./cmd/server/
     binary: cli-proxy-api-plus
     ldflags:
@@ -21,9 +22,6 @@ archives:
     format: tar.gz
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{- if eq .Arch "arm64" -}}aarch64{{- else -}}{{ .Arch }}{{- end -}}
-    format_overrides:
-      - goos: windows
-        format: zip
     files:
       - LICENSE
       - README.md
