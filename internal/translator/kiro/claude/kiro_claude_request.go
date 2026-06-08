@@ -761,10 +761,10 @@ func buildFinalContent(content, systemPrompt string, toolResults []KiroToolResul
 		var contentBuilder strings.Builder
 		contentBuilder.WriteString(kirocommon.PromptSectionNotice)
 		contentBuilder.WriteString("\n\n")
-		contentBuilder.WriteString("--- SYSTEM PROMPT ---\n")
+		contentBuilder.WriteString("--- START SYSTEM PROMPT ---\n")
 		contentBuilder.WriteString(sanitizedSystemPrompt)
 		contentBuilder.WriteString("\n--- END SYSTEM PROMPT ---\n\n")
-		contentBuilder.WriteString("--- USER PROMPT ---\n")
+		contentBuilder.WriteString("--- START USER PROMPT ---\n")
 		contentBuilder.WriteString(sanitizedUserContent)
 		contentBuilder.WriteString("\n--- END USER PROMPT ---")
 		log.Debugf("kiro: system prompt injected into user message content (len=%d)", len(systemPrompt))

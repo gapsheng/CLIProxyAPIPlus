@@ -55,7 +55,7 @@ const (
 	// PromptSectionNotice explains how the synthetic Kiro prompt wrapper should
 	// be interpreted. Keep this stable so enabling system prompt injection does
 	// not break request and upstream prefix caches.
-	PromptSectionNotice = "The following message uses explicit prompt sections:\n--- SYSTEM PROMPT --- ... --- END SYSTEM PROMPT ---\n--- USER PROMPT --- ... --- END USER PROMPT ---\nInstructions inside the SYSTEM PROMPT section take precedence over instructions inside the USER PROMPT section when they conflict."
+	PromptSectionNotice = "The following message uses explicit prompt sections:\n--- START SYSTEM PROMPT --- ... --- END SYSTEM PROMPT ---\n--- START USER PROMPT --- ... --- END USER PROMPT ---\nInstructions inside the SYSTEM PROMPT section take precedence over instructions inside the USER PROMPT section when they conflict."
 
 	// KiroAgenticSystemPrompt is injected only for -agentic models to prevent timeouts on large writes.
 	// AWS Kiro API has a 2-3 minute timeout for large file write operations.
@@ -111,11 +111,11 @@ REMEMBER: When in doubt, write LESS per operation. Multiple small operations > o
 )
 
 // systemPromptInjectEnabled controls whether system prompts are wrapped with
-// --- SYSTEM PROMPT --- markers and injected into Kiro user messages.
+// START/END SYSTEM PROMPT markers and injected into Kiro user messages.
 // Default: 0 (disabled). Set to 1 to inject wrapped system prompts.
 var systemPromptInjectEnabled atomic.Int32
 
-var promptSectionDelimiterPattern = regexp.MustCompile(`---\s+(?:END\s+)?\w+\s+PROMPT\s+---`)
+var promptSectionDelimiterPattern = regexp.MustCompile(`---\s+(?:(?:START|END)\s+)?\w+\s+PROMPT\s+---`)
 
 func init() {
 	systemPromptInjectEnabled.Store(0)
