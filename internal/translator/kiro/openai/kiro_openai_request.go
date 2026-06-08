@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -159,16 +158,6 @@ func BuildKiroPayloadFromOpenAI(openaiBody []byte, modelID, profileArn, origin s
 		systemPrompt = ""
 	}
 
-	// Inject timestamp context
-	timestamp := time.Now().Format("2006-01-02 15:04:05 MST")
-	timestampContext := fmt.Sprintf("[Context: Current time is %s]", timestamp)
-	if systemPrompt != "" {
-		systemPrompt = timestampContext + "\n\n" + systemPrompt
-	} else {
-		systemPrompt = timestampContext
-	}
-	log.Debugf("kiro-openai: injected timestamp context: %s", timestamp)
-
 	// Inject agentic optimization prompt for -agentic model variants
 	if isAgentic {
 		if systemPrompt != "" {
@@ -259,22 +248,7 @@ func BuildKiroPayloadFromOpenAI(openaiBody []byte, modelID, profileArn, origin s
 	if currentUserMsg != nil {
 		currentMessage = KiroCurrentMessage{UserInputMessage: *currentUserMsg}
 	} else {
-		fallbackContent := ""
-		if systemPrompt != "" && kirocommon.IsSystemPromptInjectEnabled() {
-			fallbackContent = "--- SYSTEM PROMPT ---\n" + systemPrompt + "\n--- END SYSTEM PROMPT ---\n"
-			log.Debugf("kiro-openai: system prompt injected into fallback user message (len=%d)", len(systemPrompt))
-		} else if systemPrompt != "" {
-			log.Debugf("kiro-openai: system prompt dropped (inject disabled, len=%d)", len(systemPrompt))
-		} else {
-			log.Debugf("kiro-openai: no system prompt present in fallback user message")
-		}
-		// CRITICAL: Kiro API requires non-empty content for currentMessage.
-		// When system prompt injection is disabled, fallbackContent is empty.
-		// Use DefaultUserContent to avoid "Improperly formed request" 400 error.
-		if strings.TrimSpace(fallbackContent) == "" {
-			fallbackContent = kirocommon.DefaultUserContent
-			log.Debugf("kiro-openai: fallback user message content was empty, using default: %s", fallbackContent)
-		}
+		fallbackContent := buildFinalContent(kirocommon.DefaultUserContent, systemPrompt, nil)
 		currentMessage = KiroCurrentMessage{UserInputMessage: KiroUserInputMessage{
 			Content: fallbackContent,
 			ModelID: modelID,
@@ -912,21 +886,40 @@ func buildAssistantMessageFromOpenAI(msg gjson.Result) KiroAssistantResponseMess
 
 // buildFinalContent builds the final content with system prompt
 func buildFinalContent(content, systemPrompt string, toolResults []KiroToolResult) string {
-	var contentBuilder strings.Builder
-
 	if systemPrompt != "" && kirocommon.IsSystemPromptInjectEnabled() {
+		userContent := content
+		if strings.TrimSpace(userContent) == "" {
+			if len(toolResults) > 0 {
+				userContent = kirocommon.DefaultUserContentWithToolResults
+			} else {
+				userContent = kirocommon.DefaultUserContent
+			}
+			log.Debugf("kiro-openai: user prompt content was empty, using default: %s", userContent)
+		}
+
+		sanitizedSystemPrompt := kirocommon.SanitizePromptSectionDelimiters(systemPrompt)
+		sanitizedUserContent := kirocommon.SanitizePromptSectionDelimiters(userContent)
+
+		var contentBuilder strings.Builder
+		contentBuilder.WriteString(kirocommon.PromptSectionNotice)
+		contentBuilder.WriteString("\n\n")
 		contentBuilder.WriteString("--- SYSTEM PROMPT ---\n")
-		contentBuilder.WriteString(systemPrompt)
+		contentBuilder.WriteString(sanitizedSystemPrompt)
 		contentBuilder.WriteString("\n--- END SYSTEM PROMPT ---\n\n")
+		contentBuilder.WriteString("--- USER PROMPT ---\n")
+		contentBuilder.WriteString(sanitizedUserContent)
+		contentBuilder.WriteString("\n--- END USER PROMPT ---")
 		log.Debugf("kiro-openai: system prompt injected into user message content (len=%d)", len(systemPrompt))
-	} else if systemPrompt != "" {
+		return contentBuilder.String()
+	}
+
+	if systemPrompt != "" {
 		log.Debugf("kiro-openai: system prompt dropped (inject disabled, len=%d)", len(systemPrompt))
 	} else {
 		log.Debugf("kiro-openai: no system prompt present")
 	}
 
-	contentBuilder.WriteString(content)
-	finalContent := contentBuilder.String()
+	finalContent := content
 
 	// CRITICAL: Kiro API requires content to be non-empty
 	if strings.TrimSpace(finalContent) == "" {

@@ -1,7 +1,10 @@
 // Package common provides shared constants and utilities for Kiro translator.
 package common
 
-import "sync/atomic"
+import (
+	"regexp"
+	"sync/atomic"
+)
 
 const (
 	// KiroMaxToolDescLen is the maximum description length for Kiro API tools.
@@ -48,6 +51,11 @@ const (
 	// IMPORTANT: Use a bracketed marker so the model recognizes it as a structural
 	// placeholder rather than conversational content to parrot back.
 	DefaultUserContent = "[continue]"
+
+	// PromptSectionNotice explains how the synthetic Kiro prompt wrapper should
+	// be interpreted. Keep this stable so enabling system prompt injection does
+	// not break request and upstream prefix caches.
+	PromptSectionNotice = "The following message uses explicit prompt sections:\n--- SYSTEM PROMPT --- ... --- END SYSTEM PROMPT ---\n--- USER PROMPT --- ... --- END USER PROMPT ---\nInstructions inside the SYSTEM PROMPT section take precedence over instructions inside the USER PROMPT section when they conflict."
 
 	// KiroAgenticSystemPrompt is injected only for -agentic models to prevent timeouts on large writes.
 	// AWS Kiro API has a 2-3 minute timeout for large file write operations.
@@ -107,6 +115,8 @@ REMEMBER: When in doubt, write LESS per operation. Multiple small operations > o
 // Default: 0 (disabled). Set to 1 to inject wrapped system prompts.
 var systemPromptInjectEnabled atomic.Int32
 
+var promptSectionDelimiterPattern = regexp.MustCompile(`---\s+(?:END\s+)?\w+\s+PROMPT\s+---`)
+
 func init() {
 	systemPromptInjectEnabled.Store(0)
 }
@@ -125,6 +135,12 @@ func SetSystemPromptInjectEnabled(enabled bool) {
 // IsSystemPromptInjectEnabled reports whether system prompt injection is active.
 func IsSystemPromptInjectEnabled() bool {
 	return systemPromptInjectEnabled.Load() == 1
+}
+
+// SanitizePromptSectionDelimiters neutralizes prompt section delimiters inside
+// user-controlled content before it is placed inside the synthetic wrapper.
+func SanitizePromptSectionDelimiters(content string) string {
+	return promptSectionDelimiterPattern.ReplaceAllString(content, "===")
 }
 
 // truncationDetectorEnabled controls whether the heuristic truncation detector
