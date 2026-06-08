@@ -2,10 +2,7 @@ name: docker-image
 
 # Builds and publishes the multi-arch Docker image for CLIProxyAPIPlus.
 #
-# Triggers:
-#   - push of any v* tag (works when a PAT pushes the tag; sync-release-tag.yml
-#     pushes via GITHUB_TOKEN and explicitly dispatches this workflow because
-#     GITHUB_TOKEN events do not cascade)
+# Trigger:
 #   - workflow_dispatch with optional `tag` input
 #
 # Runner: self-hosted `cliproxy` (docker host LXC). QEMU + buildx produce both
@@ -23,9 +20,6 @@ on:
         description: 'Existing tag to build, e.g. v6.9.45-0'
         required: false
         type: string
-  push:
-    tags:
-      - 'v*'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
